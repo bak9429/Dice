@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa2394fd18a35f84f92cfe81359f7a8a, type: 3}
+  m_Name: BOSS_01
+  m_EditorClassIdentifier: 
+  bossId: BOSS_01
+  displayName: Test Boss
+  fieldId: F1
+  spawnAxial: {x: 0, y: 0}
+  worldSpriteResource: 
+  worldSortingOrder: 50
+  uiPortraitResource: 
+  cinematicResource: 
+  maxHp: 100
+  maxShield: 50
+  groggyTurns: 1
+  groggyDamageMul: 1.5
+  damagePerHit: 5
+  aiType: Composite
+  phases:
+  - phaseId: RingAOE
+    hpThreshold: 0
+    patternKeys:
+    - RingAOE
+    - LaserLine
+  telegraphMinShowSeconds: 0.25
+  betweenPatternSeconds: 0.15
+  executeUseBlink: 1
+  executeBlinkCount: 2
+  executeBlinkOnSeconds: 0.18
+  executeBlinkOffSeconds: 0.1
+  executeFlashSeconds: 0.35
+  overrideOverlayColors: 1
+  telegraphOverlayColor: {r: 1, g: 0.85, b: 0.2, a: 0.36}
+  dangerOverlayColor: {r: 1, g: 0.2, b: 0.2, a: 0.32}
+  executeOverlayColor: {r: 1, g: 0.12, b: 0.12, a: 0.55}
