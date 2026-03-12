@@ -1,0 +1,12 @@
+Resources/GameData.meta
+Resources/UI.meta
+Resources/Video.meta
+Resources/GameData/BossDefs.meta
+Resources/GameData/Nodes.meta
+Resources/GameData/BossDefs/BOSS_01.asset
+Resources/GameData/BossDefs/BOSS_01.asset.meta
+Resources/GameData/Nodes/InvestigationDB.meta
+Resources/GameData/Nodes/InvestigationDB/INV_NewBoss.asset
+Resources/GameData/Nodes/InvestigationDB/INV_NewBoss.asset.meta
+Resources/GameData/Nodes/InvestigationDB/INV_SabertoothMutant.asset
+Resources/GameData/Nodes/InvestigationDB/INV_SabertoothMutant.asset.meta
