@@ -1,6 +1,6 @@
 // Path: Assets/Script/Rule/Core/GameFlowManager.cs
 // MVP Flow Manager
-// - hp 기반 사망 -> 허브(LobbyScene) -> 재도전(CombatScene) 루프
+// - hp 기반 사망 -> 허브(HubScene) -> 재도전(CombatScene) 루프
 // - 장비/탄종/소모품 로직과 독립 (UI/전투 수치 반영은 나중)
 
 using System;
@@ -14,7 +14,7 @@ namespace Rule.Core
     public class GameFlowManager : MonoBehaviour
     {
         [Header("Scenes")]
-        public string hubSceneName = "LobbyScene";
+        public string hubSceneName = "HubScene";
         public string combatSceneName = "CombatScene";
 
         [Header("UI")]
