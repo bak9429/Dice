@@ -155,7 +155,13 @@ namespace Rule.Core
                     RunSession.Instance.AddBossDebuff(debuffId);
             }
 
-            float finalChance = BuildSkipChance(investigationDef.skipRule, playerSTR, playerDEX, playerSYNC, _state.accumulatedAdvantage);
+            float finalChance = BuildSkipChance(
+                investigationDef.skipRule,
+                playerSTR,
+                playerDEX,
+                playerSYNC,
+                _state.accumulatedAdvantage);
+
             int roll = Random.Range(0, 100);
             bool canSkip = investigationDef.skipRule != null && investigationDef.skipRule.allowSkip && allCorrect;
             bool skipSucceeded = canSkip && roll < finalChance;
@@ -173,7 +179,7 @@ namespace Rule.Core
 
                 _view.SetNextButtonVisible(true);
                 _view.nextButton.onClick.RemoveAllListeners();
-                _view.nextButton.onClick.AddListener(SceneFlow.GoToCombat);
+                _view.nextButton.onClick.AddListener(() => RunSession.Instance.CompleteInvestigationToCombat());
                 return;
             }
 
@@ -181,11 +187,11 @@ namespace Rule.Core
             {
                 _view.SetResultText(
                     $"추리에 성공했다.\n조사 어드벤테이지: +{_state.accumulatedAdvantage}\n" +
-                    $"스킵 판정 성공! (확률 {finalChance:0.#}% / 굴림 {roll})\n임시 처리로 허브로 복귀한다.");
+                    $"스킵 판정 성공! (확률 {finalChance:0.#}% / 굴림 {roll})\n허브로 복귀한다.");
 
                 _view.SetNextButtonVisible(true);
                 _view.nextButton.onClick.RemoveAllListeners();
-                _view.nextButton.onClick.AddListener(SceneFlow.GoToHub);
+                _view.nextButton.onClick.AddListener(() => RunSession.Instance.AbortRunToHub());
             }
             else
             {
@@ -195,7 +201,7 @@ namespace Rule.Core
 
                 _view.SetNextButtonVisible(true);
                 _view.nextButton.onClick.RemoveAllListeners();
-                _view.nextButton.onClick.AddListener(SceneFlow.GoToCombat);
+                _view.nextButton.onClick.AddListener(() => RunSession.Instance.CompleteInvestigationToCombat());
             }
         }
 

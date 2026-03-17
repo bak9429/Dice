@@ -46,6 +46,15 @@ namespace Rule.Combat.Player
         {
             EnsureSpawned();
         }
+        private void RaiseDiedIfNeeded()
+        {
+            if (_deadFired) return;
+            if (state.hp > 0) return;
+
+            _deadFired = true;
+            Debug.Log("[Player] Died -> OnDied");
+            OnDied?.Invoke();
+        }
 
         public void EnsureSpawned()
         {
@@ -116,6 +125,7 @@ namespace Rule.Combat.Player
                 OnHpChanged?.Invoke(state.hp, state.maxHp);
 
             Debug.Log($"[Player] Damage {amount} (-{guardAbsorb} guard) => {appliedHp} applied, hp={state.hp}/{state.maxHp}, shield={state.shield}/{state.maxShield}, guardLeft={state.guard}");
+            RaiseDiedIfNeeded();
 
             return appliedHp;
         }
@@ -148,6 +158,7 @@ namespace Rule.Combat.Player
                 OnHpChanged?.Invoke(state.hp, state.maxHp);
 
             Debug.Log($"[Player] Damage(GM) {dmg} (gm={gm:0.00}) => bypass={bypass}, guardAbsorb={guardAbsorb}, hpApplied={appliedHp} hp={state.hp}/{state.maxHp} guardLeft={state.guard}");
+            RaiseDiedIfNeeded();
             return appliedHp;
         }
 

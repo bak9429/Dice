@@ -1,12 +1,9 @@
 // Path: Assets/Script/Rule/Core/GameFlowManager.cs
-// MVP Flow Manager
-// - hp 기반 사망 -> 허브(HubScene) -> 재도전(CombatScene) 루프
-// - 장비/탄종/소모품 로직과 독립 (UI/전투 수치 반영은 나중)
-
 using System;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using Rule.Combat.Boss;
 using Rule.Combat.Player;
 
 namespace Rule.Core
@@ -14,8 +11,8 @@ namespace Rule.Core
     public class GameFlowManager : MonoBehaviour
     {
         [Header("Scenes")]
-        public string hubSceneName = "HubScene";
-        public string combatSceneName = "CombatScene";
+        public string hubSceneName = SceneFlow.HubScene;
+        public string combatSceneName = SceneFlow.CombatScene;
 
         [Header("UI")]
         public int canvasSortOrder = 5000;
@@ -23,15 +20,17 @@ namespace Rule.Core
         private Canvas _canvas;
         private GameObject _panel;
         private Text _title;
+        private Text _body;
         private Button _btnPrimary;
         private Button _btnSecondary;
 
-        private bool _dead;
+        private bool _resolved;
+        private bool _bossSeenAlive;
+        private bool _showingResult;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
-            // Ensure singleton exists even if no scene has it.
             var existing = FindFirstObjectByType<GameFlowManager>(FindObjectsInactive.Include);
             if (existing != null) return;
 
@@ -65,56 +64,88 @@ namespace Rule.Core
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            _dead = false;
+            _resolved = false;
+            _bossSeenAlive = false;
+            _showingResult = false;
+
             EnsureOverlay();
             RefreshOverlayForScene(scene.name);
         }
 
+        private void Update()
+        {
+            if (_resolved) return;
+            if (_showingResult) return;
+            if (SceneManager.GetActiveScene().name != combatSceneName) return;
+            if (!RunSession.Instance.IsGateActive) return;
+
+            var boss = BossController.Instance;
+            if (boss == null) return;
+
+            if (boss.IsAlive)
+            {
+                _bossSeenAlive = true;
+                return;
+            }
+
+            if (_bossSeenAlive && !boss.IsAlive)
+            {
+                _resolved = true;
+                RunSession.Instance.CompleteCombatVictory();
+                ShowVictoryPanel();
+            }
+        }
+
         private void OnPlayerDied()
         {
-            _dead = true;
-            EnsureOverlay();
+            if (_resolved) return;
+            if (SceneManager.GetActiveScene().name != combatSceneName) return;
+            if (!RunSession.Instance.IsGateActive) return;
+
+            _resolved = true;
+            _showingResult = true;
 
             ShowPanel(
                 title: "DEFEATED",
+                body: "전투에서 패배했다.\n보유 중이던 런 재화를 모두 잃고 허브로 복귀한다.",
                 primaryText: "Return to Hub",
-                primaryAction: () => LoadHub(),
-                secondaryText: "Retry",
-                secondaryAction: () => LoadCombat()
+                primaryAction: () => RunSession.Instance.CompleteCombatDefeat(),
+                secondaryText: "",
+                secondaryAction: null
             );
         }
 
-        private void RefreshOverlayForScene(string sceneName)
+        private void ShowVictoryPanel()
         {
-            // 기본은 숨김. 허브에서는 'Start/Retry'만 보이게.
-            if (sceneName == hubSceneName)
+            _showingResult = true;
+
+            if (RunSession.Instance.IsGateBossPhase)
             {
                 ShowPanel(
-                    title: "HUB",
-                    primaryText: "Enter Combat",
-                    primaryAction: () => LoadCombat(),
+                    title: "GATE CLEARED",
+                    body: "관문보스를 격파했다.\n허브로 복귀해 정비할 수 있다.",
+                    primaryText: "Return to Hub",
+                    primaryAction: () => RunSession.Instance.ContinueAfterVictory(),
                     secondaryText: "",
                     secondaryAction: null
                 );
                 return;
             }
 
-            HidePanel();
+            ShowPanel(
+                title: "VICTORY",
+                body: "중간보스를 격파했다.\n다음 조사로 진행하거나 허브로 복귀할 수 있다.",
+                primaryText: "Next Investigation",
+                primaryAction: () => RunSession.Instance.ContinueAfterVictory(),
+                secondaryText: "Return to Hub",
+                secondaryAction: () => RunSession.Instance.AbortRunToHub()
+            );
         }
 
-        private void LoadHub()
+        private void RefreshOverlayForScene(string sceneName)
         {
             HidePanel();
-            SceneManager.LoadScene(hubSceneName);
         }
-
-        private void LoadCombat()
-        {
-            HidePanel();
-            SceneManager.LoadScene(combatSceneName);
-        }
-
-        // ---------------- UI Overlay ----------------
 
         private void EnsureOverlay()
         {
@@ -144,35 +175,50 @@ namespace Rule.Core
             prt.anchorMin = new Vector2(0.5f, 0.5f);
             prt.anchorMax = new Vector2(0.5f, 0.5f);
             prt.pivot = new Vector2(0.5f, 0.5f);
-            prt.sizeDelta = new Vector2(520, 260);
+            prt.sizeDelta = new Vector2(620, 320);
 
             var bg = panel.AddComponent<Image>();
-            bg.color = new Color(0, 0, 0, 0.65f);
+            bg.color = new Color(0, 0, 0, 0.72f);
 
             var cg = panel.AddComponent<CanvasGroup>();
             cg.interactable = true;
             cg.blocksRaycasts = true;
 
-            // Title
             var titleGo = new GameObject("Title", typeof(RectTransform));
             titleGo.transform.SetParent(panel.transform, false);
             var trt = titleGo.GetComponent<RectTransform>();
             trt.anchorMin = new Vector2(0, 1);
             trt.anchorMax = new Vector2(1, 1);
             trt.pivot = new Vector2(0.5f, 1);
-            trt.offsetMin = new Vector2(24, -80);
+            trt.offsetMin = new Vector2(24, -72);
             trt.offsetMax = new Vector2(-24, -24);
 
             _title = titleGo.AddComponent<Text>();
             _title.font = font;
-            _title.fontSize = 36;
+            _title.fontSize = 34;
             _title.alignment = TextAnchor.UpperLeft;
             _title.color = Color.white;
             _title.text = "";
 
-            // Buttons
-            _btnPrimary = BuildButton(panel.transform, "Primary", font, new Vector2(24, 24), new Vector2(248, 84));
-            _btnSecondary = BuildButton(panel.transform, "Secondary", font, new Vector2(272, 24), new Vector2(472, 84));
+            var bodyGo = new GameObject("Body", typeof(RectTransform));
+            bodyGo.transform.SetParent(panel.transform, false);
+            var brt = bodyGo.GetComponent<RectTransform>();
+            brt.anchorMin = new Vector2(0, 0);
+            brt.anchorMax = new Vector2(1, 1);
+            brt.offsetMin = new Vector2(24, 96);
+            brt.offsetMax = new Vector2(-24, -92);
+
+            _body = bodyGo.AddComponent<Text>();
+            _body.font = font;
+            _body.fontSize = 22;
+            _body.alignment = TextAnchor.UpperLeft;
+            _body.color = Color.white;
+            _body.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _body.verticalOverflow = VerticalWrapMode.Overflow;
+            _body.text = "";
+
+            _btnPrimary = BuildButton(panel.transform, "Primary", font, new Vector2(24, 24), new Vector2(288, 84));
+            _btnSecondary = BuildButton(panel.transform, "Secondary", font, new Vector2(332, 24), new Vector2(596, 84));
 
             return panel;
         }
@@ -183,7 +229,7 @@ namespace Rule.Core
             go.transform.SetParent(parent, false);
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0, 0);
-            rt.anchorMax = new Vector2(1, 0);
+            rt.anchorMax = new Vector2(0, 0);
             rt.pivot = new Vector2(0, 0);
             rt.offsetMin = min;
             rt.offsetMax = max;
@@ -212,14 +258,22 @@ namespace Rule.Core
             return btn;
         }
 
-        private void ShowPanel(string title, string primaryText, Action primaryAction, string secondaryText, Action secondaryAction)
+        private void ShowPanel(
+            string title,
+            string body,
+            string primaryText,
+            Action primaryAction,
+            string secondaryText,
+            Action secondaryAction)
         {
             if (_panel == null) return;
+
             _panel.SetActive(true);
 
             if (_title != null) _title.text = title;
+            if (_body != null) _body.text = body;
 
-            ConfigureButton(_btnPrimary, primaryText, primaryAction, visible: true);
+            ConfigureButton(_btnPrimary, primaryText, primaryAction, visible: !string.IsNullOrEmpty(primaryText));
             ConfigureButton(_btnSecondary, secondaryText, secondaryAction, visible: !string.IsNullOrEmpty(secondaryText));
         }
 
@@ -231,6 +285,7 @@ namespace Rule.Core
         private static void ConfigureButton(Button btn, string text, Action action, bool visible)
         {
             if (btn == null) return;
+
             btn.gameObject.SetActive(visible);
             btn.onClick.RemoveAllListeners();
 

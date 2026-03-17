@@ -1,22 +1,21 @@
-// Path: Assets/Scripts/Rule/Core/GateEnums.cs
-
+// Path: Assets/Script/Rule/Core/GateEnums.cs
 namespace Rule.Core
 {
     public enum GatePhase
     {
-        Investigation,
-        Combat
+        Investigation = 0,
+        Combat = 1,
     }
 
     public enum BossType
     {
-        MidBoss,
-        GateBoss
+        MidBoss = 0,
+        GateBoss = 1,
     }
 
     public enum CombatResult
     {
-        Victory,
-        Defeat
+        Victory = 0,
+        Defeat = 1,
     }
-}
+}   

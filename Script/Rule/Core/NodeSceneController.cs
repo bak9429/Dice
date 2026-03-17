@@ -143,10 +143,10 @@ namespace Rule.Core
 
         private InvestigationDefSO ResolveInvestigationDefFromRunSession()
         {
-            string bossId = RunSession.Instance.GetCurrentMinibossId();
+            string bossId = RunSession.Instance.GetCurrentBossId();
             if (string.IsNullOrWhiteSpace(bossId))
             {
-                Debug.LogWarning("[NodeSceneController] RunSession에서 현재 중간보스 ID를 가져오지 못했다.");
+                Debug.LogWarning("[NodeSceneController] RunSession에서 현재 보스 ID를 가져오지 못했다.");
                 return null;
             }
 
