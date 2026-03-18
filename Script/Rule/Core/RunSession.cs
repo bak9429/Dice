@@ -1,12 +1,15 @@
 // Path: Assets/Script/Rule/Core/RunSession.cs
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
+using Rule.Combat.Reward;
 
 namespace Rule.Core
 {
     public class RunSession : MonoBehaviour
     {
         private static RunSession _instance;
+
         public static RunSession Instance
         {
             get
@@ -17,6 +20,7 @@ namespace Rule.Core
                     _instance = go.AddComponent<RunSession>();
                     DontDestroyOnLoad(go);
                 }
+
                 return _instance;
             }
         }
@@ -30,6 +34,16 @@ namespace Rule.Core
         public bool IsGateActive { get; private set; } = false;
         public bool IsGateBossPhase { get; private set; } = false;
         public bool IsCombatPhase { get; private set; } = false;
+
+        public bool HasPendingResult { get; private set; } = false;
+        public bool LastCombatWon { get; private set; } = false;
+        public bool LastCombatWasGateBoss { get; private set; } = false;
+        public string LastBossId { get; private set; } = "";
+        public int LastRewardCurrency { get; private set; } = 0;
+        public int LastLostCurrency { get; private set; } = 0;
+        public int LastRewardDiceRoll { get; private set; } = 0;
+        public string LastRewardEquipmentId { get; private set; } = "";
+        public string LastRewardEquipmentType { get; private set; } = "";
 
         public readonly List<string> CurrentBossDebuffs = new List<string>();
         public readonly List<string> AcquiredDrops = new List<string>();
@@ -51,30 +65,23 @@ namespace Rule.Core
 
         public void ResetAll()
         {
-            CurrentGateId = "";
-            CurrentAreaIndex = 0;
-            CurrentNodeIndex = 0;
-            CurrentBossId = "";
+            ClearGateProgressOnly();
+            ClearPendingResultOnly();
             RunCurrency = 0;
-
-            IsGateActive = false;
-            IsGateBossPhase = false;
-            IsCombatPhase = false;
-
-            _gateBossId = "";
-
-            CurrentBossDebuffs.Clear();
             AcquiredDrops.Clear();
-            MinibossOrder.Clear();
         }
 
         public void BeginGate(string gateId)
         {
             ClearGateProgressOnly();
+            ClearPendingResultOnly();
+            RunCurrency = 0;
+            AcquiredDrops.Clear();
 
             CurrentGateId = gateId;
             CurrentAreaIndex = 0;
             CurrentNodeIndex = 0;
+            CurrentBossId = "";
 
             IsGateActive = true;
             IsGateBossPhase = false;
@@ -138,6 +145,20 @@ namespace Rule.Core
                 AcquiredDrops.Add(dropId);
         }
 
+        public void SetPendingCombatRewards(CombatRewardResult reward)
+        {
+            LastRewardDiceRoll = reward.diceRoll;
+            LastRewardCurrency = reward.currency;
+            LastRewardEquipmentId = reward.equipmentId ?? "";
+            LastRewardEquipmentType = reward.equipmentType ?? "";
+
+            if (LastRewardCurrency > 0)
+                AddRunCurrency(LastRewardCurrency);
+
+            if (!string.IsNullOrWhiteSpace(LastRewardEquipmentId))
+                AddDrop(LastRewardEquipmentId);
+        }
+
         public string GetCurrentBossId()
         {
             return CurrentBossId;
@@ -168,63 +189,128 @@ namespace Rule.Core
         {
             Debug.Log("[RunSession] AbortRunToHub");
             ClearGateProgressOnly();
-            SceneFlow.GoToHub();
-        }
-
-        public bool CanReturnToHubAfterVictory()
-        {
-            return IsGateActive && !IsCombatPhase;
-        }
-
-        public void ContinueAfterVictory()
-        {
-            if (!IsGateActive)
-            {
-                Debug.LogWarning("[RunSession] ContinueAfterVictory called without active gate.");
-                SceneFlow.GoToHub();
-                return;
-            }
-
-            Debug.Log($"[RunSession] ContinueAfterVictory bossId={CurrentBossId}, gateBossPhase={IsGateBossPhase}");
-
-            CurrentNodeIndex = 0;
-            CurrentBossDebuffs.Clear();
-
-            if (!IsGateBossPhase)
-            {
-                CurrentAreaIndex++;
-
-                if (CurrentAreaIndex >= MinibossOrder.Count)
-                {
-                    IsGateBossPhase = true;
-                    CurrentBossId = _gateBossId;
-                }
-                else
-                {
-                    IsGateBossPhase = false;
-                    CurrentBossId = GetCurrentMinibossId();
-                }
-
-                SceneFlow.GoToNode();
-                return;
-            }
-
-            ClearGateProgressOnly();
+            ClearPendingResultOnly();
             SceneFlow.GoToHub();
         }
 
         public void CompleteCombatVictory()
         {
+            if (HasPendingResult) return;
+
+            if (!IsGateActive)
+            {
+                Debug.LogWarning("[RunSession] CompleteCombatVictory called without active gate.");
+                SceneFlow.GoToHub();
+                return;
+            }
+
             IsCombatPhase = false;
+            HasPendingResult = true;
+            LastCombatWon = true;
+            LastCombatWasGateBoss = IsGateBossPhase;
+            LastBossId = CurrentBossId;
+            LastLostCurrency = 0;
+
+            Debug.Log($"[RunSession] CompleteCombatVictory boss={LastBossId}, gateBoss={LastCombatWasGateBoss}");
+            SceneFlow.GoToResult();
         }
 
         public void CompleteCombatDefeat()
         {
-            Debug.Log("[RunSession] Combat Defeat -> lose all run currency and return hub");
+            if (HasPendingResult) return;
+
+            Debug.Log("[RunSession] CompleteCombatDefeat -> Result");
             IsCombatPhase = false;
-            LoseAllRunCurrency();
+            HasPendingResult = true;
+            LastCombatWon = false;
+            LastCombatWasGateBoss = IsGateBossPhase;
+            LastBossId = CurrentBossId;
+            LastLostCurrency = RunCurrency;
+
+            LastRewardCurrency = 0;
+            LastRewardDiceRoll = 0;
+            LastRewardEquipmentId = "";
+            LastRewardEquipmentType = "";
+
+            SceneFlow.GoToResult();
+        }
+
+        public bool CanContinueAfterResult()
+        {
+            return HasPendingResult && LastCombatWon && !LastCombatWasGateBoss;
+        }
+
+        public void ContinueAfterResult()
+        {
+            if (!CanContinueAfterResult())
+            {
+                ReturnToHubAfterResult();
+                return;
+            }
+
+            CurrentAreaIndex++;
+            CurrentNodeIndex = 0;
+            CurrentBossDebuffs.Clear();
+
+            if (CurrentAreaIndex >= MinibossOrder.Count)
+            {
+                IsGateBossPhase = true;
+                CurrentBossId = _gateBossId;
+            }
+            else
+            {
+                IsGateBossPhase = false;
+                CurrentBossId = GetCurrentMinibossId();
+            }
+
+            ClearPendingResultOnly();
+            SceneFlow.GoToNode();
+        }
+
+        public void ReturnToHubAfterResult()
+        {
+            if (HasPendingResult && !LastCombatWon)
+                LoseAllRunCurrency();
+
             ClearGateProgressOnly();
+            ClearPendingResultOnly();
             SceneFlow.GoToHub();
+        }
+
+        public string BuildResultSummary()
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"Boss: {LastBossId}");
+
+            if (LastRewardDiceRoll > 0)
+                sb.AppendLine($"Dice: {LastRewardDiceRoll}");
+
+            sb.AppendLine($"Reward Currency: {LastRewardCurrency}");
+            sb.AppendLine($"Run Currency: {RunCurrency}");
+
+            if (!string.IsNullOrWhiteSpace(LastRewardEquipmentId))
+                sb.AppendLine($"Equipment: [{LastRewardEquipmentType}] {LastRewardEquipmentId}");
+            else
+                sb.AppendLine("Equipment: None");
+
+            if (!LastCombatWon)
+                sb.AppendLine($"Lost Currency: {LastLostCurrency}");
+
+            return sb.ToString();
+        }
+
+        private void ClearPendingResultOnly()
+        {
+            HasPendingResult = false;
+            LastCombatWon = false;
+            LastCombatWasGateBoss = false;
+            LastBossId = "";
+            LastRewardCurrency = 0;
+            LastLostCurrency = 0;
+            LastRewardDiceRoll = 0;
+            LastRewardEquipmentId = "";
+            LastRewardEquipmentType = "";
         }
 
         private void ClearGateProgressOnly()

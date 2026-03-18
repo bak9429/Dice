@@ -10,6 +10,7 @@ namespace Rule.Core
         public const string HubScene = "HubScene";
         public const string NodeScene = "NodeScene";
         public const string CombatScene = "CombatScene";
+        public const string ResultScene = "ResultScene";
 
         public static void GoToMainMenu()
         {
@@ -29,6 +30,11 @@ namespace Rule.Core
         public static void GoToCombat()
         {
             Load(CombatScene);
+        }
+
+        public static void GoToResult()
+        {
+            Load(ResultScene);
         }
 
         private static void Load(string sceneName)
